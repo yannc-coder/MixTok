@@ -19,12 +19,13 @@ from moviepy.editor import (
 )
 
 # ─── Cloudflare R2 (optionnel) ────────────────────────────
-import boto3
-R2_ENDPOINT   = os.getenv("R2_ENDPOINT", "")
-R2_ACCESS_KEY = os.getenv("R2_ACCESS_KEY", "")
-R2_SECRET_KEY = os.getenv("R2_SECRET_KEY", "")
-R2_BUCKET     = os.getenv("R2_BUCKET", "mixtok")
-R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "")
+CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,
+)
 
 # ─── App ──────────────────────────────────────────────────
 app = FastAPI(title="MixTok API", version="1.0.0")
