@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MixTok Studio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .app {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 1.5rem;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .header h1 span {
+      background: linear-gradient(135deg, #534AB7, #9F77DD);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e8e8e8;
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .75rem;
+    }
+
+    /* Clé API */
+    .api-row { display: flex; gap: 8px; }
+    .api-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .api-row input:focus { border-color: #7F77DD; }
+    .api-row input.valid { border-color: #1D9E75; }
+
+    .hint {
+      font-size: 12px;
+      color: #888;
+      margin-top: 6px;
+    }
+    .hint a { color: #534AB7; }
+
+    /* Boutons */
+    .btn {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-primary { background: #534AB7; color: white; }
+    .btn-primary:hover:not(:disabled) { background: #3C3489; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-secondary {
+      background: white;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+    .btn-secondary:hover { background: #f8f8f8; }
+    .btn-full { width: 100%; padding: 14px; font-size: 16px; border-radius: 12px; }
+
+    /* Recherche */
+    .search-row { display: flex; gap: 8px; margin-bottom: .75rem; }
+    .search-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    .search-row input:focus { border-color: #7F77DD; }
+
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: .75rem; }
+    .chip {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      background: white;
+      color: #555;
+      transition: all .15s;
+    }
+    .chip:hover { background: #f0effe; border-color: #AFA9EC; color: #534AB7; }
+
+    /* Compteur sélection */
+    .sel-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8f8f8;
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-bottom: .75rem;
+      font-size: 13px;
+    }
+    .sel-count { font-weight: 600; }
+    .sel-hint { color: #888; font-size: 12px; }
+
+    /* Grille vidéos */
+    .video-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .video-cell {
+      position: relative;
+      aspect-ratio: 9/16;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 2.5px solid transparent;
+      transition: border-color .15s, transform .1s;
+    }
+    .video-cell:hover { transform: scale(1.02); }
+    .video-cell.selected { border-color: #534AB7; }
+
+    .video-cell img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .cell-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(83,74,183,.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .video-cell.selected .cell-overlay { opacity: 1; }
+    .cell-num {
+      color: white;
+      font-size: 22px;
+      font-weight: 700;
+      text-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+
+    .cell-dur {
+      position: absolute;
+      bottom: 4px;
+      right: 5px;
+      font-size: 10px;
+      color: white;
+      background: rgba(0,0,0,.55);
+      padding: 1px 6px;
+      border-radius: 99px;
+    }
+
+    .cell-author {
+      position: absolute;
+      bottom: 4px;
+      left: 5px;
+      font-size: 9px;
+      color: rgba(255,255,255,.8);
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .grid-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2.5rem;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .grid-loading {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #534AB7;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Styles */
+    .styles-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    .style-btn {
+      border: 1.5px solid #e8e8e8;
+      border-radius: 12px;
+      padding: .75rem .5rem;
+      text-align: center;
+      cursor: pointer;
+      background: white;
+      transition: all .15s;
+    }
+    .style-btn:hover { border-color: #AFA9EC; background: #f7f5ff; }
+    .style-btn.active { border-color: #534AB7; background: #f0effe; }
+    .style-btn.active .style-name { color: #3C3489; }
+    .style-emoji { font-size: 22px; display: block; margin-bottom: 4px; }
+    .style-name { font-size: 13px; font-weight: 600; color: #333; }
+    .style-desc { font-size: 11px; color: #888; margin-top: 2px; }
+
+    /* Options */
+    .option-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .option-row:last-child { border-bottom: none; }
+    .option-label { font-size: 14px; color: #333; }
+    .option-ctrl { display: flex; align-items: center; gap: 8px; }
+    .option-val { font-size: 13px; font-weight: 600; color: #534AB7; min-width: 30px; text-align: right; }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 4px;
+      border-radius: 99px;
+      background: #e0e0e0;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #534AB7;
+      cursor: pointer;
+    }
+    select {
+      font-size: 13px;
+      padding: 5px 8px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background: white;
+      color: #333;
+      outline: none;
+    }
+
+    /* Backend URL */
+    .backend-row { margin-top: .75rem; }
+    .backend-row input {
+      width: 100%;
+      padding: 8px 12px;
+      font-size: 13px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      outline: none;
+      font-family: monospace;
+      color: #333;
+    }
+    .backend-row input:focus { border-color: #7F77DD; }
+    .backend-info {
+      font-size: 12px;
+      color: #888;
+      margin-top: 6px;
+      line-height: 1.6;
+    }
+    .backend-info code {
+      background: #f0f0f0;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    /* Progression */
+    .progress-card { }
+    .prog-track {
+      height: 6px;
+      background: #f0f0f0;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .prog-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #534AB7, #9F77DD);
+      border-radius: 99px;
+      transition: width .5s ease;
+    }
+    .steps-list { display: flex; flex-direction: column; gap: 8px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #aaa;
+      transition: color .2s;
+    }
+    .step.active { color: #534AB7; font-weight: 600; }
+    .step.done { color: #1D9E75; }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ddd;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+    .step.active .step-dot { background: #7F77DD; }
+    .step.done .step-dot { background: #1D9E75; }
+
+    /* Résultat */
+    .result-inner { text-align: center; }
+    .result-thumbs {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .result-thumb {
+      width: 90px;
+      height: 160px;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .result-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .result-thumb-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(83,74,183,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+    }
+    .result-thumb.main { width: 130px; height: 231px; border: 2.5px solid #534AB7; }
+
+    .res-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 1rem;
+    }
+    .stat {
+      background: #f8f8f8;
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+    .stat-v { font-size: 18px; font-weight: 700; color: #1a1a1a; }
+    .stat-k { font-size: 11px; color: #888; margin-top: 2px; }
+
+    .btn-tiktok {
+      background: #010101;
+      color: white;
+      border: none;
+    }
+    .btn-tiktok:hover { background: #333; }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    .btn-shuffle {
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid #ddd;
+      cursor: pointer;
+      background: white;
+      color: #534AB7;
+      font-weight: 600;
+      float: right;
+    }
+    .btn-shuffle:hover { background: #f0effe; }
+
+    /* Utilitaires */
+    .hidden { display: none !important; }
+
+    .success-msg {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #166534;
+      margin-top: .75rem;
+    }
+
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #991b1b;
+      margin-top: .75rem;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #bbb;
+      margin-top: 1.5rem;
+    }
+    footer a { color: #888; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <h1>Mix<span>Tok</span> Studio</h1>
+    <p>Sélectionne 3 clips Pexels → montage TikTok automatique</p>
+  </div>
+
+  <!-- ── ÉTAPE 1 : Clé API ──────────────────────────── -->
+  <div class="card" id="cardKey">
+    <p class="section-label">Étape 1 — Clé API Pexels</p>
+    <div class="api-row">
+      <input type="text" id="apiKey" placeholder="Colle ta clé Pexels ici..." autocomplete="off">
+      <button class="btn btn-primary" onclick="saveKey()">Valider</button>
+    </div>
+    <p class="hint">
+      Gratuite sur <a href="https://www.pexels.com/api/" target="_blank">pexels.com/api</a>
+      — inscription en 1 min, 200 requêtes/heure.
+    </p>
+  </div>
+
+  <!-- ── ÉTAPE 2 : Recherche & sélection ───────────── -->
+  <div class="card hidden" id="cardSearch">
+    <p class="section-label">Étape 2 — Choisis 3 clips <button class="btn-shuffle" onclick="doSearch()">🔀 Nouvelles vidéos</button></p>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="chats, fail, danse, cuisine..."
+             onkeydown="if(event.key==='Enter') doSearch()">
+      <button class="btn btn-primary" id="btnSearch" onclick="doSearch()">Chercher</button>
+    </div>
+    <div class="chips">
+      <span class="chip" onclick="quickSearch('funny cats')">🐱 Chats</span>
+      <span class="chip" onclick="quickSearch('fail funny')">😅 Fail</span>
+      <span class="chip" onclick="quickSearch('dance')">💃 Danse</span>
+      <span class="chip" onclick="quickSearch('cooking')">🍳 Cuisine</span>
+      <span class="chip" onclick="quickSearch('dog funny')">🐶 Chiens</span>
+      <span class="chip" onclick="quickSearch('nature')">🌿 Nature</span>
+      <span class="chip" onclick="quickSearch('baby')">👶 Bébé</span>
+    </div>
+
+    <div class="sel-bar">
+      <span class="sel-count" id="selCount">0 clip sélectionné</span>
+      <span class="sel-hint">Clique sur 3 clips</span>
+    </div>
+
+    <div class="video-grid" id="videoGrid">
+      <div class="grid-empty">Lance une recherche ci-dessus ↑</div>
+    </div>
+  </div>
+
+  <!-- ── ÉTAPE 3 : Style + options ─────────────────── -->
+  <div class="card hidden" id="cardStyle">
+    <p class="section-label">Étape 3 — Style & options</p>
+
+    <div class="styles-grid">
+      <div class="style-btn active" data-style="fun">
+        <span class="style-emoji">😂</span>
+        <span class="style-name">Fun</span>
+        <span class="style-desc">Accéléré, cartoon</span>
+      </div>
+      <div class="style-btn" data-style="drama">
+        <span class="style-emoji">🎭</span>
+        <span class="style-name">Drama</span>
+        <span class="style-desc">Zoom lent, suspense</span>
+      </div>
+      <div class="style-btn" data-style="hype">
+        <span class="style-emoji">🔥</span>
+        <span class="style-name">Hype</span>
+        <span class="style-desc">Beat drop, flash</span>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid #f0f0f0; padding-top: .75rem; margin-bottom: .75rem;">
+      <div class="option-row">
+        <span class="option-label">Durée cible</span>
+        <div class="option-ctrl">
+          <input type="range" id="duration" min="15" max="60" step="5" value="30"
+                 oninput="document.getElementById('durVal').textContent=this.value+'s'">
+          <span class="option-val" id="durVal">30s</span>
+        </div>
+      </div>
+      <div class="option-row">
+        <span class="option-label">Durée par clip</span>
+        <div class="option-ctrl">
+          <input type="range" id="clipLen" min="2" max="8" step="1" value="4"
+                 oninput="document.getElementById('clipVal').textContent=this.value+'s'">
+          <span class="option-val" id="clipVal">4s</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="section-label">URL du backend Railway (optionnel)</p>
+    <div class="backend-row">
+      <input type="text" id="backendUrl" placeholder="https://mixtok-xxxx.railway.app">
+    </div>
+    <p class="backend-info">
+      Sans backend → simulation visuelle.<br>
+      Avec backend → vrai MP4 généré par FFmpeg + téléchargeable.<br>
+      Déploie le <code>mixtok-backend.zip</code> sur <a href="https://railway.app" target="_blank" style="color:#534AB7">railway.app</a> (gratuit).
+    </p>
+
+    <button class="btn btn-primary btn-full" id="btnGo" onclick="generate()" style="margin-top:1rem">
+      🎬 Lancer le montage
+    </button>
+  </div>
+
+  <!-- ── PROGRESSION ────────────────────────────────── -->
+  <div class="card hidden" id="cardProgress">
+    <p class="section-label">Montage en cours...</p>
+    <div class="prog-track">
+      <div class="prog-bar" id="progBar" style="width:0%"></div>
+    </div>
+    <div class="steps-list" id="stepsList"></div>
+  </div>
+
+  <!-- ── RÉSULTAT ───────────────────────────────────── -->
+  <div class="card hidden" id="cardResult">
+    <p class="section-label">Ton TikTok est prêt !</p>
+    <div class="result-inner">
+      <div class="result-thumbs">
+        <div class="result-thumb" id="rthumb0"><img src="" alt=""></div>
+        <div class="result-thumb main" id="rthumb1">
+          <img src="" alt="">
+          <div class="result-thumb-overlay">▶</div>
+        </div>
+        <div class="result-thumb" id="rthumb2"><img src="" alt=""></div>
+      </div>
+
+      <div class="res-stats">
+        <div class="stat"><div class="stat-v" id="rv-dur">30s</div><div class="stat-k">durée</div></div>
+        <div class="stat"><div class="stat-v" id="rv-clips">3</div><div class="stat-k">clips</div></div>
+        <div class="stat"><div class="stat-v" id="rv-style">😂</div><div class="stat-k">style</div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="downloadResult()">⬇ Télécharger MP4</button>
+        <button class="btn btn-tiktok" onclick="shareToTikTok()">▶ Poster sur TikTok</button>
+        <button class="btn btn-secondary" onclick="restart()" style="grid-column:1/-1">↩ Recommencer</button>
+      </div>
+
+      <div id="resultMsg" class="hidden"></div>
+    </div>
+  </div>
+
+  <footer>
+    Vidéos fournies par <a href="https://www.pexels.com" target="_blank">Pexels</a> · Montage par FFmpeg
+  </footer>
+</div>
+
+<script>
+  // ── État ────────────────────────────────────────────
+  let apiKey = '';
+  let allVideos = [];
+  let selected = [];       // [{id, url, thumb, dur, author}]
+  let chosenStyle = 'fun';
+  let resultUrl = '';
+
+  const STEPS = [
+    'Téléchargement des vidéos',
+    'Détection des moments forts',
+    'Recadrage 9:16 TikTok',
+    'Application du style',
+    'Assemblage des clips',
+    'Export MP4 final',
+    'Upload vers le cloud',
+  ];
+
+  // ── Utilitaires ────────────────────────────────────
+  function show(id)  { document.getElementById(id).classList.remove('hidden'); }
+  function hide(id)  { document.getElementById(id).classList.add('hidden'); }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Étape 1 : Clé API ──────────────────────────────
+  function saveKey() {
+    const val = document.getElementById('apiKey').value.trim();
+    if (!val || val.length < 20) {
+      alert('La clé API Pexels doit faire au moins 20 caractères.');
+      return;
+    }
+    apiKey = val;
+    document.getElementById('apiKey').classList.add('valid');
+    show('cardSearch');
+    document.getElementById('searchInput').focus();
+  }
+
+  // ── Étape 2 : Recherche ────────────────────────────
+  function quickSearch(q) {
+    document.getElementById('searchInput').value = q;
+    doSearch();
+  }
+
+  async function doSearch() {
+    if (!apiKey) return;
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+
+    const btn = document.getElementById('btnSearch');
+    btn.disabled = true;
+    btn.textContent = '...';
+    document.getElementById('videoGrid').innerHTML =
+      '<div class="grid-loading"><div class="spinner"></div><p style="color:#aaa;font-size:13px">Chargement Pexels...</p></div>';
+
+    try {
+      const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(q)}&per_page=9&orientation=portrait&size=small&page=${Math.floor(Math.random()*20)+1}`;
+      const res = await fetch(url, { headers: { Authorization: apiKey } });
+
+      if (res.status === 401) throw new Error('Clé API invalide. Vérifie sur pexels.com/api');
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+
+      const data = await res.json();
+      allVideos = data.videos || [];
+      renderGrid();
+    } catch(e) {
+      document.getElementById('videoGrid').innerHTML =
+        `<div class="grid-empty" style="color:#c0392b">${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Chercher';
+    }
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('videoGrid');
+    if (!allVideos.length) {
+      grid.innerHTML = '<div class="grid-empty">Aucune vidéo trouvée. Essaie un autre mot.</div>';
+      return;
+    }
+    grid.innerHTML = allVideos.map((v, i) => {
+      const selIdx = selected.findIndex(s => s.id === v.id);
+      const isSel  = selIdx !== -1;
+      return `
+        <div class="video-cell ${isSel ? 'selected' : ''}" id="cell-${i}" onclick="toggleSelect(${i})">
+          <img src="${v.image}" loading="lazy" alt="Clip ${i+1}">
+          <div class="cell-overlay">
+            <span class="cell-num">${isSel ? selIdx+1 : '+'}</span>
+          </div>
+          <span class="cell-dur">${v.duration}s</span>
+          <span class="cell-author">${v.user?.name||''}</span>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleSelect(i) {
+    const v = allVideos[i];
+    const idx = selected.findIndex(s => s.id === v.id);
+
+    if (idx !== -1) {
+      selected.splice(idx, 1);
+    } else {
+      if (selected.length >= 3) selected.shift(); // remplace le plus ancien
+
+      // Choisit la meilleure qualité disponible (HD portrait de préférence)
+      const files = v.video_files || [];
+      const hd = files.find(f => f.quality === 'hd' && f.height >= f.width)
+               || files.find(f => f.quality === 'hd')
+               || files[0];
+
+      selected.push({
+        id: v.id,
+        url: hd?.link || '',
+        thumb: v.image,
+        dur: v.duration,
+        author: v.user?.name || '',
+      });
+    }
+
+    renderGrid();
+    updateSelBar();
+  }
+
+  function updateSelBar() {
+    const n = selected.length;
+    document.getElementById('selCount').textContent =
+      n === 0 ? '0 clip sélectionné'
+      : n === 1 ? '1 clip sélectionné'
+      : `${n}/3 clips sélectionnés`;
+
+    if (n === 3) show('cardStyle');
+    else hide('cardStyle');
+  }
+
+  // ── Styles ─────────────────────────────────────────
+  document.querySelectorAll('.style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      chosenStyle = btn.dataset.style;
+    });
+  });
+
+  // ── Génération ─────────────────────────────────────
+  async function generate() {
+    const backendUrl = document.getElementById('backendUrl').value.trim().replace(/\/$/, '');
+
+    hide('cardKey');
+    hide('cardSearch');
+    hide('cardStyle');
+    show('cardProgress');
+
+    const list = document.getElementById('stepsList');
+    list.innerHTML = STEPS.map((s, i) =>
+      `<div class="step" id="st-${i}"><div class="step-dot"></div>${s}</div>`
+    ).join('');
+
+    const bar = document.getElementById('progBar');
+
+    if (backendUrl) {
+      await runWithBackend(backendUrl, bar);
+    } else {
+      await runSimulated(bar);
+    }
+  }
+
+  function markStep(i, cls) {
+    const el = document.getElementById(`st-${i}`);
+    if (el) el.className = 'step ' + cls;
+  }
+
+  async function runSimulated(bar) {
+    for (let i = 0; i < STEPS.length; i++) {
+      markStep(i, 'active');
+      bar.style.width = Math.round(((i) / STEPS.length) * 100) + '%';
+      await sleep(500 + Math.random() * 800);
+      markStep(i, 'done');
+    }
+    bar.style.width = '100%';
+    await sleep(300);
+    showResult(null);
+  }
+
+  async function runWithBackend(url, bar) {
+    try {
+      markStep(0, 'active');
+
+      const res = await fetch(`${url}/montage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_urls: selected.map(s => s.url),
+          style: chosenStyle,
+          target_duration: parseInt(document.getElementById('duration').value),
+          clip_duration: parseInt(document.getElementById('clipLen').value),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`Backend ${res.status}`);
+      const job = await res.json();
+      markStep(0, 'done');
+
+      let lastStep = 1;
+      while (true) {
+        await sleep(1500);
+        const status = await fetch(`${url}/status/${job.job_id}`).then(r => r.json());
+        bar.style.width = status.progress + '%';
+
+        const expectedStep = Math.min(Math.floor(status.progress / (100 / STEPS.length)), STEPS.length - 1);
+        while (lastStep <= expectedStep) {
+          markStep(lastStep - 1, 'done');
+          markStep(lastStep, 'active');
+          lastStep++;
+        }
+
+        if (status.status === 'done') {
+          STEPS.forEach((_, i) => markStep(i, 'done'));
+          bar.style.width = '100%';
+          await sleep(300);
+          showResult(status.result_url);
+          break;
+        }
+        if (status.status === 'error') {
+          throw new Error(status.error || 'Erreur inconnue');
+        }
+      }
+    } catch(e) {
+      console.warn('Backend error, falling back to simulation:', e.message);
+      const errDiv = document.createElement('div');
+      errDiv.className = 'error-msg';
+      errDiv.style.marginBottom = '1rem';
+      errDiv.textContent = `⚠️ Backend inaccessible (${e.message}). Simulation locale...`;
+      document.getElementById('cardProgress').prepend(errDiv);
+      await runSimulated(bar);
+    }
+  }
+
+  // ── Affichage résultat ─────────────────────────────
+  function showResult(url) {
+    resultUrl = url || '';
+    const emojis = { fun: '😂', drama: '🎭', hype: '🔥' };
+    const dur = document.getElementById('duration').value;
+
+    document.getElementById('rv-dur').textContent = dur + 's';
+    document.getElementById('rv-clips').textContent = selected.length;
+    document.getElementById('rv-style').textContent = emojis[chosenStyle] || chosenStyle;
+
+    // Miniatures des clips sélectionnés
+    selected.forEach((v, i) => {
+      const thumb = document.getElementById(`rthumb${i}`);
+      if (thumb) thumb.querySelector('img').src = v.thumb;
+    });
+
+    hide('cardProgress');
+    show('cardResult');
+
+    // Message selon si on a une vraie URL ou pas
+    const msgDiv = document.getElementById('resultMsg');
+    if (resultUrl && resultUrl.startsWith('http')) {
+      msgDiv.className = 'success-msg';
+      msgDiv.textContent = '✅ MP4 prêt — clique sur Télécharger pour récupérer la vidéo.';
+    } else {
+      msgDiv.className = 'success-msg';
+      msgDiv.textContent = '🎬 Simulation complète ! Déploie le backend Railway pour obtenir un vrai MP4.';
+    }
+    msgDiv.classList.remove('hidden');
+  }
+
+  function downloadResult() {
+    if (resultUrl && resultUrl.startsWith('http')) {
+      const a = document.createElement('a');
+      a.href = resultUrl;
+      a.download = `mixtok_${chosenStyle}_${Date.now()}.mp4`;
+      a.click();
+    } else {
+      alert('Configure et déploie le backend Render pour télécharger un vrai MP4 !');
+    }
+  }
+
+  function shareToTikTok() {
+    if (!resultUrl || !resultUrl.startsWith('http')) {
+      alert('Tu dois d\'abord générer un vrai MP4 via le backend !\n\nColle l\'URL Render et relance le montage.');
+      return;
+    }
+    // TikTok deep link mobile — ouvre l'appli TikTok avec la vidéo
+    // Sur mobile : ouvre directement TikTok
+    // Sur desktop : affiche les instructions
+    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = `tiktok://share?video=${encodeURIComponent(resultUrl)}`;
+      setTimeout(() => {
+        // Fallback si TikTok n'est pas installé
+        window.open('https://www.tiktok.com/upload', '_blank');
+      }, 1500);
+    } else {
+      // Desktop : ouvre TikTok upload avec instructions
+      const win = window.open('https://www.tiktok.com/upload', '_blank');
+      setTimeout(() => {
+        alert('💡 Sur desktop :\n1. TikTok Studio vient de s\'ouvrir\n2. Clique "Télécharger" d\'abord pour récupérer ton MP4\n3. Glisse le fichier dans TikTok Studio\n\nSur mobile : installe l\'app TikTok et ça s\'ouvre directement !');
+      }, 500);
+    }
+  }
+
+  function restart() {
+    selected = [];
+    allVideos = [];
+    resultUrl = '';
+    chosenStyle = 'fun';
+    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-style="fun"]').classList.add('active');
+    document.getElementById('videoGrid').innerHTML = '<div class="grid-empty">Lance une recherche ci-dessus ↑</div>';
+    document.getElementById('searchInput').value = '';
+    updateSelBar();
+
+    hide('cardResult');
+    hide('cardProgress');
+    show('cardKey');
+    show('cardSearch');
+  }
+</script>
+</body>
+</html>
