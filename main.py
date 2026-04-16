@@ -96,8 +96,7 @@ async def run_job(job_id, urls, style):
 def health(): return {"ok": True}
 
 @app.post("/montage")
-async def montage(req: Req, background_tasks):
-    from fastapi import BackgroundTasks
+async def montage(req: Req):
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {"status": "pending", "progress": 0}
     asyncio.create_task(run_job(job_id, req.video_urls[:3], req.style))
