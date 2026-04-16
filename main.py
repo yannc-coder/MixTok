@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import httpx
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -20,7 +20,6 @@ app.add_middleware(
     max_age=86400,
 )
 
-jobs = {}
 OUTPUTS_DIR = Path("/tmp/mixtok_outputs")
 OUTPUTS_DIR.mkdir(exist_ok=True)
 
@@ -30,14 +29,6 @@ class MontageRequest(BaseModel):
     target_duration: int = 30
     clip_duration: int = 4
 
-class JobStatus(BaseModel):
-    job_id: str
-    status: str
-    progress: int = 0
-    step: str = ""
-    result_url: Optional[str] = None
-    error: Optional[str] = None
-
 STYLES = {
     "drama": {"speed": 1.0,  "color": 1.4, "fade": 0.4},
     "fun":   {"speed": 1.5,  "color": 1.0, "fade": 0.1},
@@ -45,9 +36,6 @@ STYLES = {
 }
 
 W, H = 720, 1280
-
-def upd(job_id, **kw):
-    jobs[job_id].update(kw)
 
 async def download_video(url, dest):
     async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
@@ -86,21 +74,34 @@ def apply_style(clip, style_name):
         clip = clip.fx(vfx.colorx, cfg["color"])
     return clip.fadein(cfg["fade"]).fadeout(cfg["fade"])
 
-async def run_montage(job_id, req):
+@app.get("/")
+def root():
+    return {"service": "MixTok API", "status": "ok"}
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
+@app.post("/montage")
+async def create_montage(req: MontageRequest):
+    """Montage synchrone — attend le résultat et retourne l'URL directement."""
+    if len(req.video_urls) < 2:
+        raise HTTPException(400, "Minimum 2 vidéos")
+
+    job_id = str(uuid.uuid4())[:8]
     tmpdir = Path(tempfile.mkdtemp())
+
     try:
-        upd(job_id, status="processing", step="Téléchargement des vidéos", progress=5)
+        # 1. Téléchargement
         paths = []
         for i, url in enumerate(req.video_urls):
             dest = tmpdir / f"v{i}.mp4"
             await download_video(url, dest)
             paths.append(dest)
-            upd(job_id, progress=5 + int((i+1)/len(req.video_urls)*30),
-                step=f"Vidéo {i+1}/{len(req.video_urls)} téléchargée")
 
-        upd(job_id, progress=40, step="Analyse et découpage des clips")
+        # 2. Extraction + style
         clips = []
-        for i, path in enumerate(paths):
+        for path in paths:
             try:
                 clip = VideoFileClip(str(path))
                 clip = crop_916(clip)
@@ -109,20 +110,18 @@ async def run_montage(job_id, req):
                 sub = clip.subclip(start, end)
                 sub = apply_style(sub, req.style)
                 clips.append(sub)
-                upd(job_id, progress=40 + int((i+1)/len(paths)*25),
-                    step=f"Clip {i+1} prêt")
             except Exception as e:
-                print(f"Erreur clip {i}: {e}")
+                print(f"Erreur clip: {e}")
                 continue
 
         if not clips:
-            raise Exception("Aucun clip valide extrait")
+            raise Exception("Aucun clip valide")
 
         if req.style in ["fun", "hype"]:
             import random
             random.shuffle(clips)
 
-        upd(job_id, progress=70, step="Assemblage du montage")
+        # 3. Concat
         total, final = 0, []
         for c in clips:
             if total + c.duration > req.target_duration:
@@ -131,8 +130,8 @@ async def run_montage(job_id, req):
             total += c.duration
 
         video = concatenate_videoclips(final, method="compose")
-        upd(job_id, progress=82, step="Export MP4...")
 
+        # 4. Export
         out = OUTPUTS_DIR / f"{job_id}.mp4"
         video.write_videofile(
             str(out), fps=24, codec="libx264",
@@ -142,44 +141,21 @@ async def run_montage(job_id, req):
         )
         video.close()
 
-        upd(job_id, status="done", progress=100,
-            step="Terminé !", result_url=f"/download/{job_id}")
+        return {
+            "job_id": job_id,
+            "status": "done",
+            "progress": 100,
+            "result_url": f"https://mixtok.onrender.com/download/{job_id}"
+        }
 
     except Exception as e:
-        upd(job_id, status="error", error=str(e))
         traceback.print_exc()
+        raise HTTPException(500, str(e))
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
-@app.get("/")
-def root():
-    return {"service": "MixTok API", "status": "ok"}
-
-@app.get("/health")
-def health():
-    return {"ok": True}
-
-@app.post("/montage", response_model=JobStatus)
-async def create_montage(req: MontageRequest, bg: BackgroundTasks):
-    if len(req.video_urls) < 2:
-        raise HTTPException(400, "Minimum 2 vidéos")
-    job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        "job_id": job_id, "status": "pending",
-        "progress": 0, "step": "En attente...",
-        "result_url": None, "error": None,
-    }
-    bg.add_task(run_montage, job_id, req)
-    return jobs[job_id]
-
-@app.get("/status/{job_id}", response_model=JobStatus)
-def get_status(job_id):
-    if job_id not in jobs:
-        raise HTTPException(404, "Job introuvable")
-    return jobs[job_id]
-
 @app.get("/download/{job_id}")
-def download(job_id):
+def download(job_id: str):
     path = OUTPUTS_DIR / f"{job_id}.mp4"
     if not path.exists():
         raise HTTPException(404, "Fichier introuvable")
